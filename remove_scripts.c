@@ -10,6 +10,21 @@
 char rbuf[MAX_BUF_SIZE + 1];
 char wbuf[MAX_BUF_SIZE + 1];
 
+enum html_state_t {
+    FREE,
+    TAG,
+    DROP
+} state;
+
+/*
+struct stack_node {
+    struct stack_node * next;
+    char tag[MAX_TAG_SIZE + 1];
+} bottom;
+
+struct stack_node * stack_top;
+*/
+
 void win() {
     fprintf(stderr, "You have obtained code execution.");
 }
@@ -74,19 +89,6 @@ void parseArgs(int argc, char * argv[]) {
         }
     }
 }
-
-enum html_state_t {
-    FREE,
-    TAG,
-    DROP
-} state;
-
-struct stack_node {
-    struct stack_node * next;
-    char tag[MAX_TAG_SIZE + 1];
-} bottom;
-
-struct stack_node * stack_top;
 
 int reachGreatThan(int len, int cursor) {
     while (cursor < len && rbuf[cursor] != '>') {
@@ -264,13 +266,15 @@ int main(int argc, char* argv[]) {
     int i;
     int rv;
 
+    /*
     stack_top = &bottom;
+
+    strncpy(bottom.tag, ">", 2);
+    */
 
     state = FREE;
 
     parseArgs(argc, argv);
-
-    strncpy(bottom.tag, ">", 2);
 
     // read and write
     while ((rv = read(0, rbuf, MAX_BUF_SIZE)) > 0) {
