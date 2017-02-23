@@ -4,6 +4,8 @@
 #include <fcntl.h>
 #include <stdlib.h>
 
+#define TOLOWER(c) ((c >= 'A' && c <= 'Z') ? (c + 32) : c)
+
 #define MAX_BUF_SIZE 2080
 
 char rbuf[MAX_BUF_SIZE + 1];
@@ -88,6 +90,22 @@ void parseArgs(int argc, char * argv[]) {
     }
 }
 
+// case insensitive string compare
+// str2 should be lower case string
+int strncmp_lower(const char * str1, const char * str2, size_t num) {
+    char c;
+    while (num != 0) {
+        c = *str1;
+        if (TOLOWER(c) != *str2) {
+            return -1;
+        }
+        ++str1;
+        ++str2;
+        --num;
+    }
+    return 0;
+}
+
 // get the index of first occurrence of '>'
 int reachGreatThan(int len, int cursor) {
     while (cursor < len && rbuf[cursor] != '>') {
@@ -136,7 +154,7 @@ void fetchMore(int * len, int * len_w, int * cursor_r) {
 void initiateEndTag(int * cursor_r, int * len_w, int cursor_t, int len) {
     int cursor_n = reachEndOfName(len, *cursor_r + 2);
     int temp_len;
-    if ((cursor_n - *cursor_r - 2 == 6) && strncmp(rbuf + *cursor_r + 2, "script", 6) == 0) {
+    if ((cursor_n - *cursor_r - 2 == 6) && strncmp_lower(rbuf + *cursor_r + 2, "script", 6) == 0) {
         // </script...>: set state FREE and step through it
         state = FREE;
         *cursor_r = cursor_t + 1;
@@ -159,7 +177,7 @@ void initiateStartTag(int * cursor_r, int * len_w, int cursor_t, int len) {
         memcpy(wbuf + *len_w, rbuf + *cursor_r, temp_len);
         *len_w += temp_len;
         *cursor_r = cursor_t + 1;
-    } else if ((cursor_n - *cursor_r - 1 == 6) && strncmp(rbuf + *cursor_r + 1, "script", 6) == 0) {
+    } else if ((cursor_n - *cursor_r - 1 == 6) && strncmp_lower(rbuf + *cursor_r + 1, "script", 6) == 0) {
         // <script...>: set state as DROP, step pass it
         if (rbuf[cursor_t - 1] != '/') {
             state = DROP;
@@ -274,7 +292,7 @@ int parseBuffer(int len) {
                     wbuf[len_w++] = rbuf[cursor_r++];
                 } else {
                     cursor_eoa = reachEndOfAttr(cursor_t, cursor_r);
-                    if (strncmp(rbuf + skipSpace(cursor_t, cursor_r), "on", 2) != 0) {
+                    if (strncmp_lower(rbuf + skipSpace(cursor_t, cursor_r), "on", 2) != 0) {
                         memcpy(wbuf + len_w, rbuf + cursor_r, cursor_eoa - cursor_r + 1);
                         len_w += cursor_eoa - cursor_r + 1;
                     }
