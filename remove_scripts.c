@@ -4,7 +4,11 @@
 #include <fcntl.h>
 #include <stdlib.h>
 
+// if capital character, to lower case
 #define TOLOWER(c) ((c >= 'A' && c <= 'Z') ? (c + 32) : c)
+
+// 1 if is alphanumeric, 0 otherwise
+#define ISALPHANUM(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ? 1 : 0)
 
 #define MAX_BUF_SIZE 2080
 
@@ -114,14 +118,9 @@ int reachGreatThan(int len, int cursor) {
     return cursor;
 }
 
-// Return true if the character is alphanumeric
-int isAlphaNum(char c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
-}
-
 // Advance the cursor to the first non-alphanumeric character
 int reachEndOfName(int len, int cursor) {
-    while (cursor < len && isAlphaNum(rbuf[cursor])) {
+    while (cursor < len && ISALPHANUM(rbuf[cursor])) {
         cursor++;
     }
     return cursor;
@@ -256,7 +255,7 @@ int parseBuffer(int len) {
                     // found
                     if (rbuf[cursor_r + 1] == '/') {
                         initiateEndTag(&cursor_r, &len_w, cursor_t, len);
-                    } else if (isAlphaNum(rbuf[cursor_r + 1])) {
+                    } else if (ISALPHANUM(rbuf[cursor_r + 1])) {
                         initiateStartTag(&cursor_r, &len_w, cursor_t, len);
                     } else {
                         wbuf[len_w++] = rbuf[cursor_r++];
@@ -272,7 +271,7 @@ int parseBuffer(int len) {
                     // found
                     if (rbuf[cursor_r + 1] == '/') {
                         initiateEndTag(&cursor_r, &len_w, cursor_t, len);
-                    } else if (isAlphaNum(rbuf[cursor_r + 1])) {
+                    } else if (ISALPHANUM(rbuf[cursor_r + 1])) {
                         initiateStartTag(&cursor_r, &len_w, cursor_t, len);
                     } else {
                         wbuf[len_w++] = rbuf[cursor_r++];
