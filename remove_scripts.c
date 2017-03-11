@@ -10,7 +10,7 @@
 // 1 if is alphanumeric, 0 otherwise
 #define ISALPHANUM(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ? 1 : 0)
 
-#define MAX_BUF_SIZE 5
+#define BUFFER_INCREMENT 5
 
 size_t len_buf = 0;
 char * rbuf = NULL;
@@ -151,7 +151,7 @@ void fetchMore(int * len, int * len_w, int * cursor_r) {
         // raiseErr("Don't you think this tag is too long?");
 
         // Extend buffer
-        len_buf += MAX_BUF_SIZE;
+        len_buf += BUFFER_INCREMENT;
         rbuf = Realloc(rbuf, len_buf);
         wbuf = Realloc(wbuf, len_buf);
 
@@ -356,7 +356,8 @@ int main(int argc, char* argv[]) {
     // Initialize the state to FREE
     state = FREE;
 
-    len_buf = 1 + MAX_BUF_SIZE;
+    // Initialize the buffer
+    len_buf = 1 + BUFFER_INCREMENT;
     rbuf = Malloc(len_buf);
     wbuf = Malloc(len_buf);
 
@@ -366,8 +367,8 @@ int main(int argc, char* argv[]) {
     // Read a block from input, process and write to output
     while ((rv = read(0, rbuf, len_buf - 1)) > 0) {
         rbuf[rv] = 0;
-        fprintf(stderr, "%d byte read\n", rv);
-        fprintf(stderr, "-------\n[%s]\n", rbuf);
+        fprintf(stderr, "%d byte read\n-------\n[%s]\n", rv, rbuf);
+        // wbuf may change in parseBuffer
         rv = parseBuffer(rv);
         Write(wbuf, rv);
     }
