@@ -10,10 +10,11 @@
 // 1 if is alphanumeric, 0 otherwise
 #define ISALPHANUM(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ? 1 : 0)
 
-#define MAX_BUF_SIZE 2080
+#define MAX_BUF_SIZE 5
 
-char rbuf[MAX_BUF_SIZE + 1];
-char wbuf[MAX_BUF_SIZE + 1];
+size_t len_buf = 0;
+char * rbuf = NULL;
+char * wbuf = NULL;
 
 enum html_state_t {
     FREE,
@@ -72,6 +73,22 @@ int Write(const void *buf, size_t nbyte) {
     return rv;
 }
 
+void * Malloc(size_t size) {
+    void * p = malloc(size);
+    if (p == NULL) {
+        raiseErr("Not enough space.");
+    }
+    return p;
+}
+
+void * Realloc(void * ptr, size_t size) {
+    void * p = realloc(ptr, size);
+    if (p == NULL) {
+        raiseErr("Not enough space.");
+    }
+    return p;
+}
+
 /*
  * End of wrapped functions
  */
@@ -128,26 +145,54 @@ int reachEndOfName(int len, int cursor) {
 
 // The current tag is not complete, read more data into the buffer
 void fetchMore(int * len, int * len_w, int * cursor_r) {
+    int rv;
     if (*cursor_r == 0) {
-        raiseErr("Don't you think this tag is too long?");
+        // if '<' at the beginning of buffer, try to extend buffer using realloc
+        // raiseErr("Don't you think this tag is too long?");
+
+        // Extend buffer
+        len_buf += MAX_BUF_SIZE;
+        rbuf = Realloc(rbuf, len_buf);
+        wbuf = Realloc(wbuf, len_buf);
+
+        // Read addictional trunk
+        rv = Read(rbuf + *len, len_buf - 1 - *len);
+
+        if (rv == 0) {
+            raiseErr("Unclosed tag.");
+        }
+        *len += rv;
+        rbuf[*len] = 0;
+
+        fprintf(stderr, "Realloc: %d byte read, length is %d\n", rv, *len);
+        fprintf(stderr, "-------\n[%s]\n", rbuf);
+
+    } else {
+        // if '<' not at the beginning of buffer, try to move '<' to beginning
+        // and read cursor_r byte
+        if (*len_w > 0) {
+            Write(wbuf, *len_w);
+            fprintf(stderr, "Written: %d\n", *len_w);
+            *len_w = 0;
+        }
+
+        // move incomplete data to the beginning of buffer
+        memcpy(rbuf, rbuf + *cursor_r, *len - *cursor_r);
+
+        // read data
+        rv = Read(rbuf + (*len - *cursor_r), *cursor_r);
+        if (rv == 0) {
+            raiseErr("Unclosed tag.");
+        }
+        *len += rv - *cursor_r;
+        rbuf[*len] = 0;
+
+        fprintf(stderr, "%d byte read, length is %d\n", rv, *len);
+        fprintf(stderr, "-------\n[%s]\n", rbuf);
+
+        // reset cursor of read buffer
+        *cursor_r = 0;
     }
-    if (*len_w > 0) {
-        Write(wbuf, *len_w);
-    }
-
-    // move incomplete data to the beginning of buffer
-    memcpy(rbuf, rbuf + *cursor_r, *len - *cursor_r);
-
-    // read data
-    *len += Read(rbuf + (*len - *cursor_r), *cursor_r) - *cursor_r;
-    rbuf[*len] = 0;
-
-    fprintf(stderr, "%d byte read, length is %d\n", *cursor_r, *len);
-    fprintf(stderr, "--in---\n%s\n", rbuf);
-
-    // reset cursor of read/write buffer
-    *cursor_r = 0;
-    *len_w = 0;
 }
 
 void initiateEndTag(int * cursor_r, int * len_w, int cursor_t, int len) {
@@ -260,7 +305,6 @@ int parseBuffer(int len) {
                     } else {
                         wbuf[len_w++] = rbuf[cursor_r++];
                     }
-
                 }
             } else if (state == DROP) {
                 cursor_t = reachGreatThan(len, cursor_r);
@@ -276,7 +320,6 @@ int parseBuffer(int len) {
                     } else {
                         wbuf[len_w++] = rbuf[cursor_r++];
                     }
-
                 }
             }
         } else {
@@ -303,25 +346,30 @@ int parseBuffer(int len) {
         }
     }
     wbuf[len_w] = 0;
+    fprintf(stderr, "Written: %d, %s\n", len_w, wbuf);
     return len_w;
 }
 
 int main(int argc, char* argv[]) {
-    int i;
     int rv;
 
     // Initialize the state to FREE
     state = FREE;
 
+    len_buf = 1 + MAX_BUF_SIZE;
+    rbuf = Malloc(len_buf);
+    wbuf = Malloc(len_buf);
+
     // Parse arguments
     parseArgs(argc, argv);
 
     // Read a block from input, process and write to output
-    while ((rv = read(0, rbuf, MAX_BUF_SIZE)) > 0) {
+    while ((rv = read(0, rbuf, len_buf - 1)) > 0) {
         rbuf[rv] = 0;
         fprintf(stderr, "%d byte read\n", rv);
-        fprintf(stderr, "-------\n%s\n", rbuf);
-        Write(wbuf, parseBuffer(rv));
+        fprintf(stderr, "-------\n[%s]\n", rbuf);
+        rv = parseBuffer(rv);
+        Write(wbuf, rv);
     }
     return 0;
 
