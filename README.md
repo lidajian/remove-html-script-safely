@@ -19,5 +19,33 @@ Pay close attention to the potential for scripts to appear outside of **\<script
 Example input:
 
 ``` HTML
+<!DOCTYPE html>
+<html>
+<body>
 
+<h1>What Can JavaScript Do?</h1>
+
+<p id="demo">JavaScript can change HTML content.</p>
+
+<button type="button" onclick='document.getElementById("demo").innerHTML = "Hello JavaScript!"'>Click Me!</button>
+
+</body>
+</html>
+```
+
+Desired output (note that only the script is removed, and all other HTML elements, including the button remain):
+
+``` HTML
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1>What Can JavaScript Do?</h1>
+
+<p id="demo">JavaScript can change HTML content.</p>
+
+<button type="button">Click Me!</button>
+
+</body>
+</html>
 ```
