@@ -62,4 +62,4 @@ In the break-it phase, all teams will have access to the source code of all buil
 
 Code execution: Input causes the “win” routine to be executed. Break-it teams may not attempt to print the message “You have obtained code execution” by any other means (e.g. including it in HTML).
 
-
+**Feel free to break our program and send the exploit to [li.dajian@foxmail.com](mailto:li.dajian@foxmail.com)**
