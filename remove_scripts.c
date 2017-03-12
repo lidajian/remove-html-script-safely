@@ -254,7 +254,8 @@ int reachEndOfAttr(int len, int cursor, int * skip_attribute) {
 
     if (strncmp_lower(rbuf + cursor, "on", 2) == 0) {
         *skip_attribute = 1;
-    } else if (strncmp_lower(rbuf + cursor, "href", 4) == 0) {
+    } else if (strncmp_lower(rbuf + cursor, "href", 4) == 0 ||
+            strncmp_lower(rbuf + cursor, "action", 6) == 0) {
         is_sensitive_tag = 1;
     }
 
