@@ -13,10 +13,11 @@
 #define BUFFER_INCREMENT 5
 
 size_t len_buf = 0;
+int skip_attribute = 0;
 char * rbuf = NULL;
 char * wbuf = NULL;
 
-enum html_state_t {
+enum {
     FREE,
     TAG,
     DROP
@@ -127,7 +128,7 @@ int strncmp_lower(const char * str1, const char * str2, size_t num) {
     return 0;
 }
 
-// get the index of first occurrence of '>'
+// Advance the cursor to the first occurrence of '>'
 int reachGreatThan(int len, int cursor) {
     while (cursor < len && rbuf[cursor] != '>') {
         ++cursor;
@@ -148,7 +149,6 @@ void fetchMore(int * len, int * len_w, int * cursor_r) {
     int rv;
     if (*cursor_r == 0) {
         // if '<' at the beginning of buffer, try to extend buffer using realloc
-        // raiseErr("Don't you think this tag is too long?");
 
         // Extend buffer
         len_buf += BUFFER_INCREMENT;
@@ -248,9 +248,17 @@ int skipSpace(int len, int cursor) {
 // Advance the cursor to the end of Attribute
 int reachEndOfAttr(int len, int cursor) {
     char c;
+    int is_sensitive_tag = 0;
 
     // skip space
     cursor = skipSpace(len, cursor);
+
+    if (strncmp_lower(rbuf + cursor, "on", 2) == 0) {
+        skip_attribute = 1;
+    }
+    if (strncmp_lower(rbuf + cursor, "href", 4) == 0) {
+        is_sensitive_tag = 1;
+    }
 
     // step through the name of attribute
     cursor = reachEndOfName(len, cursor);
@@ -271,6 +279,13 @@ int reachEndOfAttr(int len, int cursor) {
         raiseErr("Attribute error!");
     }
     c = rbuf[cursor++];
+
+    // skip space
+    cursor = skipSpace(len, cursor);
+
+    if (is_sensitive_tag && (strncmp_lower(rbuf + cursor, "javascript:", 11) == 0)) {
+        skip_attribute = 1;
+    }
 
     // match another quote sign
     while (cursor < len && rbuf[cursor] != c) {
@@ -303,7 +318,9 @@ int parseBuffer(int len) {
                     } else if (ISALPHANUM(rbuf[cursor_r + 1])) {
                         initiateStartTag(&cursor_r, &len_w, cursor_t, len);
                     } else {
-                        wbuf[len_w++] = rbuf[cursor_r++];
+                        memcpy(wbuf + len_w, rbuf + cursor_r, cursor_t - cursor_r + 1);
+                        len_w += cursor_t - cursor_r + 1;
+                        cursor_r = cursor_t + 1;
                     }
                 }
             } else if (state == DROP) {
@@ -318,7 +335,9 @@ int parseBuffer(int len) {
                     } else if (ISALPHANUM(rbuf[cursor_r + 1])) {
                         initiateStartTag(&cursor_r, &len_w, cursor_t, len);
                     } else {
-                        wbuf[len_w++] = rbuf[cursor_r++];
+                        memcpy(wbuf + len_w, rbuf + cursor_r, cursor_t - cursor_r + 1);
+                        len_w += cursor_t - cursor_r + 1;
+                        cursor_r = cursor_t + 1;
                     }
                 }
             }
@@ -333,8 +352,9 @@ int parseBuffer(int len) {
                 } else if (rbuf[cursor_r] == '/') {
                     wbuf[len_w++] = rbuf[cursor_r++];
                 } else {
+                    skip_attribute = 0;
                     cursor_eoa = reachEndOfAttr(cursor_t, cursor_r);
-                    if (strncmp_lower(rbuf + skipSpace(cursor_t, cursor_r), "on", 2) != 0) {
+                    if (!skip_attribute) {
                         memcpy(wbuf + len_w, rbuf + cursor_r, cursor_eoa - cursor_r + 1);
                         len_w += cursor_eoa - cursor_r + 1;
                     }
