@@ -13,7 +13,6 @@
 #define BUFFER_INCREMENT 5
 
 size_t len_buf = 0;
-int skip_attribute = 0;
 char * rbuf = NULL;
 char * wbuf = NULL;
 
@@ -246,7 +245,7 @@ int skipSpace(int len, int cursor) {
 }
 
 // Advance the cursor to the end of Attribute
-int reachEndOfAttr(int len, int cursor) {
+int reachEndOfAttr(int len, int cursor, int * skip_attribute) {
     char c;
     int is_sensitive_tag = 0;
 
@@ -254,9 +253,8 @@ int reachEndOfAttr(int len, int cursor) {
     cursor = skipSpace(len, cursor);
 
     if (strncmp_lower(rbuf + cursor, "on", 2) == 0) {
-        skip_attribute = 1;
-    }
-    if (strncmp_lower(rbuf + cursor, "href", 4) == 0) {
+        *skip_attribute = 1;
+    } else if (strncmp_lower(rbuf + cursor, "href", 4) == 0) {
         is_sensitive_tag = 1;
     }
 
@@ -284,7 +282,7 @@ int reachEndOfAttr(int len, int cursor) {
     cursor = skipSpace(len, cursor);
 
     if (is_sensitive_tag && (strncmp_lower(rbuf + cursor, "javascript:", 11) == 0)) {
-        skip_attribute = 1;
+        *skip_attribute = 1;
     }
 
     // match another quote sign
@@ -300,6 +298,7 @@ int reachEndOfAttr(int len, int cursor) {
 int parseBuffer(int len) {
     int cursor_r = 0;
     int len_w = 0;
+    int skip_attribute = 0;
     int cursor_t;
     int cursor_eoa;
     while (cursor_r < len) {
@@ -353,7 +352,7 @@ int parseBuffer(int len) {
                     wbuf[len_w++] = rbuf[cursor_r++];
                 } else {
                     skip_attribute = 0;
-                    cursor_eoa = reachEndOfAttr(cursor_t, cursor_r);
+                    cursor_eoa = reachEndOfAttr(cursor_t, cursor_r, &skip_attribute);
                     if (!skip_attribute) {
                         memcpy(wbuf + len_w, rbuf + cursor_r, cursor_eoa - cursor_r + 1);
                         len_w += cursor_eoa - cursor_r + 1;
