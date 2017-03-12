@@ -50,7 +50,7 @@ Desired output (note that only the script is removed, and all other HTML element
 
 All teams must include a method called “win” with no parameters that prints the message “You have obtained code execution.”
 
-## BREAD-IT
+## BREAK-IT
 
 In the break-it phase, all teams will have access to the source code of all build-it turnins. Break-it submissions will consist of scripts that demonstrate a vulnerability or bug in one or more programs. Bugs should be labeled with a category (least to most severe by list below):
 
