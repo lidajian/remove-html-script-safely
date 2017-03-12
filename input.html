@@ -16,8 +16,9 @@ int func();
 
 <a href="javascript:alert();">this is a special link</a>
 
-<form action="javascript:alert();">
-    <input type="submit" value="Submit">
+<form action="javascript:alert('javascript runs');">
+    <input type="submit" value="Submit"/>
+    <input type="submit" value="Submit2" formaction="javascript:alert('javascript runs too');"/>
 </form>
 
 </body>
