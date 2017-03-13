@@ -149,6 +149,14 @@ char * reachEndOfName(char * buf_end, char * cursor) {
     return cursor;
 }
 
+// Advance the cursor to the first character that is NOT space
+char * skipSpace(char * buf_end, char * cursor) {
+    while (cursor < buf_end && ISSPACE(*cursor)) {
+        ++cursor;
+    }
+    return cursor;
+}
+
 // The current tag is not complete, read more data into the buffer
 void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
     int rv;
@@ -163,6 +171,7 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         rbuf = Realloc(rbuf, len_buf);
         wbuf = Realloc(wbuf, len_buf);
 
+        // Migrate pointers to new buffers
         *cursor_r = rbuf + (*cursor_r - old_rbuf);
         *cursor_w = wbuf + (*cursor_w - old_wbuf);
         *rbuf_end = rbuf + (*rbuf_end - old_rbuf);
@@ -247,21 +256,13 @@ void initiateStartTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
     }
 }
 
-// Advance the cursor to the first character that is NOT space
-char * skipSpace(char * buf_end, char * cursor) {
-    while (cursor < buf_end && ISSPACE(*cursor)) {
-        ++cursor;
-    }
-    return cursor;
-}
-
 // Advance the cursor to the end of Attribute
-char * reachEndOfAttr(char * buf_end, char * cursor, int * skip_attribute) {
+char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
     char c;
     int is_sensitive_tag = 0;
 
     // skip space
-    cursor = skipSpace(buf_end, cursor);
+    cursor = skipSpace(rbuf_end, cursor);
 
     if (strncmp_lower(cursor, "on", 2) == 0) {
         *skip_attribute = 1;
@@ -272,10 +273,10 @@ char * reachEndOfAttr(char * buf_end, char * cursor, int * skip_attribute) {
     }
 
     // step through the name of attribute
-    cursor = reachEndOfName(buf_end, cursor);
+    cursor = reachEndOfName(rbuf_end, cursor);
 
     // skip space
-    cursor = skipSpace(buf_end, cursor);
+    cursor = skipSpace(rbuf_end, cursor);
 
     // match an '='
     if (*(cursor++) != '=') {
@@ -283,7 +284,7 @@ char * reachEndOfAttr(char * buf_end, char * cursor, int * skip_attribute) {
     }
 
     // skip space
-    cursor = skipSpace(buf_end, cursor);
+    cursor = skipSpace(rbuf_end, cursor);
 
     // match quote sign
     if (!ISQUOTE(*cursor)) {
@@ -292,17 +293,17 @@ char * reachEndOfAttr(char * buf_end, char * cursor, int * skip_attribute) {
     c = *(cursor++);
 
     // skip space
-    cursor = skipSpace(buf_end, cursor);
+    cursor = skipSpace(rbuf_end, cursor);
 
     if (is_sensitive_tag && (strncmp_lower(cursor, "javascript:", 11) == 0)) {
         *skip_attribute = 1;
     }
 
     // match another quote sign
-    while (cursor < buf_end && *cursor != c) {
+    while (cursor < rbuf_end && *cursor != c) {
         ++cursor;
     }
-    if (cursor == buf_end) {
+    if (cursor == rbuf_end) {
         raiseErr("Unclosed quote.");
     }
     return cursor;
