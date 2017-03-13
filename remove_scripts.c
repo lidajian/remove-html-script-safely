@@ -22,13 +22,24 @@
  * Global variables
  */
 
+// length of buffers
 size_t len_buf = 0;
+
+// read buffer
 char * rbuf = NULL;
+
+// write buffer
 char * wbuf = NULL;
 
+/*
+ * state of state machine
+ * ACCEPT: move character from read buffer to write buffer in this state, should detect '<'
+ * INTAG:  in a pair of <>, should detect attributes that contains javascript
+ * DROP:   skip the current character because '<script>', should detect '</script>'
+ */
 enum {
-    FREE,
-    TAG,
+    ACCEPT,
+    INTAG,
     DROP
 } state;
 
@@ -107,6 +118,9 @@ void * Realloc(void * ptr, size_t size) {
  * Utility functions
  */
 
+/*
+ * parseArgs: parse arguments from command line
+ */
 void parseArgs(int argc, char * argv[]) {
     int i;
     // Parse the parameters
@@ -125,8 +139,10 @@ void parseArgs(int argc, char * argv[]) {
     }
 }
 
-// case insensitive string compare
-// str2 should be lower case string
+/*
+ * strncmp_lower: lower case string compare, translate capital letter in
+ *                str1 to lower case and compare with letter in str2
+ */
 int strncmp_lower(const char * str1, const char * str2, size_t num) {
     char c;
     while (num != 0) {
@@ -141,7 +157,9 @@ int strncmp_lower(const char * str1, const char * str2, size_t num) {
     return 0;
 }
 
-// Advance the cursor to the first occurrence of '>'
+/*
+ * reachGreatThan: Advance the cursor to the first occurrence of '>'
+ */
 char * reachGreatThan(char * buf_end, char * cursor) {
     while (cursor < buf_end && *cursor != '>') {
         ++cursor;
@@ -149,7 +167,9 @@ char * reachGreatThan(char * buf_end, char * cursor) {
     return cursor;
 }
 
-// Advance the cursor to the first non-alphanumeric character
+/*
+ * reachEndOfName: Advance the cursor to the first non-alphanumeric character
+ */
 char * reachEndOfName(char * buf_end, char * cursor) {
     while (cursor < buf_end && ISALPHANUM(*cursor)) {
         cursor++;
@@ -157,7 +177,9 @@ char * reachEndOfName(char * buf_end, char * cursor) {
     return cursor;
 }
 
-// Advance the cursor to the first character that is NOT space
+/*
+ * skipSpace: Advance the cursor to the first character that is NOT space
+ */
 char * skipSpace(char * buf_end, char * cursor) {
     while (cursor < buf_end && ISSPACE(*cursor)) {
         ++cursor;
@@ -165,7 +187,12 @@ char * skipSpace(char * buf_end, char * cursor) {
     return cursor;
 }
 
-// The current tag is not complete, read more data into the buffer
+/*
+ * fetchMore: The current tag is not complete, read more data into the buffer.
+ *            If the the first character is '<' we extend the buffers and
+ *            refill the buffer. Otherwise, we move '<' to the beginning of
+ *            read buffer and refill the read buffer.
+ */
 void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
     int rv;
     char * old_rbuf, * old_wbuf;
@@ -222,23 +249,32 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
     }
 }
 
+/*
+ * initiateEndTag: Change state base on the tag name. If tag name is 'script'
+ *                 change state back to ACCEPT, otherwise set state to INTAG.
+ */
 void initiateEndTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
     char * cursor_n = reachEndOfName(cursor_t, *cursor_r + 2);
     int temp_len;
     if ((cursor_n - *cursor_r - 2 == 6) && strncmp_lower(*cursor_r + 2, "script", 6) == 0) {
-        // </script...>: set state FREE and step through it
-        state = FREE;
+        // </script...>: set state ACCEPT and step through it
+        state = ACCEPT;
         *cursor_r = cursor_t + 1;
     } else {
-        // set state as TAG, copy to write buffer and step pass the name
+        // set state as INTAG, copy to write buffer and step pass the name
         temp_len = cursor_n - *cursor_r;
         memcpy(*cursor_w, *cursor_r, temp_len);
         *cursor_w += temp_len;
         *cursor_r = cursor_n;
-        state = TAG;
+        state = INTAG;
     }
 }
 
+/*
+ * initiateStartTag: Chage state base on the tag name. If tag name is 'script'
+ *                   change state to DROP, if is comment or something copy
+ *                   directly, otherwise set state to INTAG
+ */
 void initiateStartTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
     char * cursor_n = reachEndOfName(cursor_t, *cursor_r + 1);
     int temp_len;
@@ -255,16 +291,18 @@ void initiateStartTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
         }
         *cursor_r = cursor_t + 1;
     } else {
-        // set state as TAG, copy to write buffer and step pass the name
+        // set state as INTAG, copy to write buffer and step pass the name
         temp_len = cursor_n - *cursor_r;
         memcpy(*cursor_w, *cursor_r, temp_len);
         *cursor_w += temp_len;
         *cursor_r = cursor_n;
-        state = TAG;
+        state = INTAG;
     }
 }
 
-// Advance the cursor to the end of Attribute
+/*
+ * reachEndOfAttr: Advance the cursor to the end of Attribute
+ */
 char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
     char c;
     int is_sensitive_tag = 0;
@@ -317,7 +355,9 @@ char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
     return cursor;
 }
 
-// Filter content in read buffer and put filtered content in write buffer
+/*
+ * parseBuffer: Filter content in read buffer and put filtered content in write buffer
+ */
 char * parseBuffer(char * rbuf_end) {
     char * cursor_r = rbuf;
     char * cursor_w = wbuf;
@@ -326,9 +366,9 @@ char * parseBuffer(char * rbuf_end) {
     char * cursor_eoa;
     while (cursor_r < rbuf_end) {
         if (*cursor_r == '<') {
-            if (state == TAG) {
+            if (state == INTAG) {
                 raiseErr("Nested tag is not allowed!");
-            } else if (state == FREE) {
+            } else if (state == ACCEPT) {
                 cursor_t = reachGreatThan(rbuf_end, cursor_r);
                 if (cursor_t >= rbuf_end) {
                     // not found
@@ -364,12 +404,12 @@ char * parseBuffer(char * rbuf_end) {
                 }
             }
         } else {
-            if (state == FREE) {
+            if (state == ACCEPT) {
                 *(cursor_w++) = *(cursor_r++);
-            } else if (state == TAG) {
+            } else if (state == INTAG) {
                 // find '>'
                 if (*(cursor_r) == '>') {
-                    state = FREE;
+                    state = ACCEPT;
                     *(cursor_w++) = *(cursor_r++);
                 } else if (*(cursor_r) == '/') {
                     *(cursor_w++) = *(cursor_r++);
@@ -399,8 +439,8 @@ int main(int argc, char* argv[]) {
     int rv;
     char * wbuf_end;
 
-    // Initialize the state to FREE
-    state = FREE;
+    // Initialize the state to ACCEPT
+    state = ACCEPT;
 
     // Initialize the buffer
     len_buf = BUFFER_INCREMENT;
