@@ -18,6 +18,10 @@
 
 #define BUFFER_INCREMENT 5
 
+/*
+ * Global variables
+ */
+
 size_t len_buf = 0;
 char * rbuf = NULL;
 char * wbuf = NULL;
@@ -27,6 +31,10 @@ enum {
     TAG,
     DROP
 } state;
+
+/*
+ * Win function
+ */
 
 void win() {
     fprintf(stderr, "You have obtained code execution.");
@@ -96,7 +104,7 @@ void * Realloc(void * ptr, size_t size) {
 }
 
 /*
- * End of wrapped functions
+ * Utility functions
  */
 
 void parseArgs(int argc, char * argv[]) {
@@ -309,6 +317,7 @@ char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
     return cursor;
 }
 
+// Filter content in read buffer and put filtered content in write buffer
 char * parseBuffer(char * rbuf_end) {
     char * cursor_r = rbuf;
     char * cursor_w = wbuf;
@@ -381,6 +390,10 @@ char * parseBuffer(char * rbuf_end) {
     fprintf(stderr, "Written: %ld, %s\n", cursor_w - wbuf, wbuf);
     return cursor_w;
 }
+
+/*
+ * Main function
+ */
 
 int main(int argc, char* argv[]) {
     int rv;
