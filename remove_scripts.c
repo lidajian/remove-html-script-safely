@@ -10,6 +10,12 @@
 // 1 if is alphanumeric, 0 otherwise
 #define ISALPHANUM(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ? 1 : 0)
 
+// 1 if is space, 0 otherwise
+#define ISSPACE(c) ((c == ' ' || c == '\n' || c == '\t') ? 1 : 0)
+
+// 1 if is quote, 0 otherwise
+#define ISQUOTE(c) ((c == '\'' || c == '\"') ? 1 : 0)
+
 #define BUFFER_INCREMENT 5
 
 size_t len_buf = 0;
@@ -128,236 +134,241 @@ int strncmp_lower(const char * str1, const char * str2, size_t num) {
 }
 
 // Advance the cursor to the first occurrence of '>'
-int reachGreatThan(int len, int cursor) {
-    while (cursor < len && rbuf[cursor] != '>') {
+char * reachGreatThan(char * buf_end, char * cursor) {
+    while (cursor < buf_end && *cursor != '>') {
         ++cursor;
     }
     return cursor;
 }
 
 // Advance the cursor to the first non-alphanumeric character
-int reachEndOfName(int len, int cursor) {
-    while (cursor < len && ISALPHANUM(rbuf[cursor])) {
+char * reachEndOfName(char * buf_end, char * cursor) {
+    while (cursor < buf_end && ISALPHANUM(*cursor)) {
         cursor++;
     }
     return cursor;
 }
 
 // The current tag is not complete, read more data into the buffer
-void fetchMore(int * len, int * len_w, int * cursor_r) {
+void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
     int rv;
-    if (*cursor_r == 0) {
+    char * old_rbuf, * old_wbuf;
+    if (*cursor_r == rbuf) {
         // if '<' at the beginning of buffer, try to extend buffer using realloc
+        old_rbuf = rbuf;
+        old_wbuf = wbuf;
 
         // Extend buffer
         len_buf += BUFFER_INCREMENT;
         rbuf = Realloc(rbuf, len_buf);
         wbuf = Realloc(wbuf, len_buf);
 
+        *cursor_r = rbuf + (*cursor_r - old_rbuf);
+        *cursor_w = wbuf + (*cursor_w - old_wbuf);
+        *rbuf_end = rbuf + (*rbuf_end - old_rbuf);
+
         // Read addictional trunk
-        rv = Read(rbuf + *len, len_buf - 1 - *len);
+        rv = Read(*rbuf_end, len_buf - (*rbuf_end - rbuf));
 
         if (rv == 0) {
             raiseErr("Unclosed tag.");
         }
-        *len += rv;
-        rbuf[*len] = 0;
+        *rbuf_end += rv;
 
-        fprintf(stderr, "Realloc: %d byte read, length is %d\n", rv, *len);
+        fprintf(stderr, "Realloc: %d byte read, length is %ld\n", rv, *rbuf_end - rbuf);
         fprintf(stderr, "-------\n[%s]\n", rbuf);
 
     } else {
         // if '<' not at the beginning of buffer, try to move '<' to beginning
         // and read cursor_r byte
-        if (*len_w > 0) {
-            Write(wbuf, *len_w);
-            fprintf(stderr, "Written: %d\n", *len_w);
-            *len_w = 0;
+        if (*cursor_w > wbuf) {
+            Write(wbuf, *cursor_w - wbuf);
+            fprintf(stderr, "Written: %ld\n", *cursor_w - wbuf);
+            *cursor_w = wbuf;
         }
 
         // move incomplete data to the beginning of buffer
-        memcpy(rbuf, rbuf + *cursor_r, *len - *cursor_r);
+        memcpy(rbuf, *cursor_r, *rbuf_end - *cursor_r);
 
         // read data
-        rv = Read(rbuf + (*len - *cursor_r), *cursor_r);
+        rv = Read(rbuf + (*rbuf_end - *cursor_r), *cursor_r - rbuf);
         if (rv == 0) {
             raiseErr("Unclosed tag.");
         }
-        *len += rv - *cursor_r;
-        rbuf[*len] = 0;
+        *rbuf_end += rv - (*cursor_r - rbuf);
 
-        fprintf(stderr, "%d byte read, length is %d\n", rv, *len);
+        fprintf(stderr, "%d byte read, length is %ld\n", rv, *rbuf_end - rbuf);
         fprintf(stderr, "-------\n[%s]\n", rbuf);
 
         // reset cursor of read buffer
-        *cursor_r = 0;
+        *cursor_r = rbuf;
     }
 }
 
-void initiateEndTag(int * cursor_r, int * len_w, int cursor_t, int len) {
-    int cursor_n = reachEndOfName(len, *cursor_r + 2);
+void initiateEndTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
+    char * cursor_n = reachEndOfName(cursor_t, *cursor_r + 2);
     int temp_len;
-    if ((cursor_n - *cursor_r - 2 == 6) && strncmp_lower(rbuf + *cursor_r + 2, "script", 6) == 0) {
+    if ((cursor_n - *cursor_r - 2 == 6) && strncmp_lower(*cursor_r + 2, "script", 6) == 0) {
         // </script...>: set state FREE and step through it
         state = FREE;
         *cursor_r = cursor_t + 1;
     } else {
         // set state as TAG, copy to write buffer and step pass the name
         temp_len = cursor_n - *cursor_r;
-        memcpy(wbuf + *len_w, rbuf + *cursor_r, temp_len);
-        *len_w += temp_len;
+        memcpy(*cursor_w, *cursor_r, temp_len);
+        *cursor_w += temp_len;
         *cursor_r = cursor_n;
         state = TAG;
     }
 }
 
-void initiateStartTag(int * cursor_r, int * len_w, int cursor_t, int len) {
-    int cursor_n = reachEndOfName(len, *cursor_r + 1);
+void initiateStartTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
+    char * cursor_n = reachEndOfName(cursor_t, *cursor_r + 1);
     int temp_len;
-    if (rbuf[*cursor_r + 1] == '!') {
+    if (*(*cursor_r + 1) == '!') {
         // <!...> tag: simply step pass it
         temp_len = cursor_t - *cursor_r + 1;
-        memcpy(wbuf + *len_w, rbuf + *cursor_r, temp_len);
-        *len_w += temp_len;
+        memcpy(*cursor_w, *cursor_r, temp_len);
+        *cursor_w += temp_len;
         *cursor_r = cursor_t + 1;
-    } else if ((cursor_n - *cursor_r - 1 == 6) && strncmp_lower(rbuf + *cursor_r + 1, "script", 6) == 0) {
+    } else if ((cursor_n - *cursor_r - 1 == 6) && strncmp_lower(*cursor_r + 1, "script", 6) == 0) {
         // <script...>: set state as DROP, step pass it
-        if (rbuf[cursor_t - 1] != '/') {
+        if (*(cursor_t - 1) != '/') {
             state = DROP;
         }
         *cursor_r = cursor_t + 1;
     } else {
         // set state as TAG, copy to write buffer and step pass the name
         temp_len = cursor_n - *cursor_r;
-        memcpy(wbuf + *len_w, rbuf + *cursor_r, temp_len);
-        *len_w += temp_len;
+        memcpy(*cursor_w, *cursor_r, temp_len);
+        *cursor_w += temp_len;
         *cursor_r = cursor_n;
         state = TAG;
     }
 }
 
 // Advance the cursor to the first character that is NOT space
-int skipSpace(int len, int cursor) {
-    while (cursor < len && rbuf[cursor] == ' ') {
+char * skipSpace(char * buf_end, char * cursor) {
+    while (cursor < buf_end && ISSPACE(*cursor)) {
         ++cursor;
     }
     return cursor;
 }
 
 // Advance the cursor to the end of Attribute
-int reachEndOfAttr(int len, int cursor, int * skip_attribute) {
+char * reachEndOfAttr(char * buf_end, char * cursor, int * skip_attribute) {
     char c;
     int is_sensitive_tag = 0;
 
     // skip space
-    cursor = skipSpace(len, cursor);
+    cursor = skipSpace(buf_end, cursor);
 
-    if (strncmp_lower(rbuf + cursor, "on", 2) == 0) {
+    if (strncmp_lower(cursor, "on", 2) == 0) {
         *skip_attribute = 1;
-    } else if (strncmp_lower(rbuf + cursor, "href", 4) == 0 ||
-            strncmp_lower(rbuf + cursor, "action", 6) == 0 ||
-            strncmp_lower(rbuf + cursor, "formaction", 10) == 0) {
+    } else if (strncmp_lower(cursor, "href", 4) == 0 ||
+            strncmp_lower(cursor, "action", 6) == 0 ||
+            strncmp_lower(cursor, "formaction", 10) == 0) {
         is_sensitive_tag = 1;
     }
 
     // step through the name of attribute
-    cursor = reachEndOfName(len, cursor);
+    cursor = reachEndOfName(buf_end, cursor);
 
     // skip space
-    cursor = skipSpace(len, cursor);
+    cursor = skipSpace(buf_end, cursor);
 
     // match an '='
-    if (rbuf[cursor++] != '=') {
+    if (*(cursor++) != '=') {
         raiseErr("Attribute error!");
     }
 
     // skip space
-    cursor = skipSpace(len, cursor);
+    cursor = skipSpace(buf_end, cursor);
 
     // match quote sign
-    if (rbuf[cursor] != '\'' && rbuf[cursor] != '\"') {
+    if (!ISQUOTE(*cursor)) {
         raiseErr("Attribute error!");
     }
-    c = rbuf[cursor++];
+    c = *(cursor++);
 
     // skip space
-    cursor = skipSpace(len, cursor);
+    cursor = skipSpace(buf_end, cursor);
 
-    if (is_sensitive_tag && (strncmp_lower(rbuf + cursor, "javascript:", 11) == 0)) {
+    if (is_sensitive_tag && (strncmp_lower(cursor, "javascript:", 11) == 0)) {
         *skip_attribute = 1;
     }
 
     // match another quote sign
-    while (cursor < len && rbuf[cursor] != c) {
+    while (cursor < buf_end && *cursor != c) {
         ++cursor;
     }
-    if (cursor == len) {
+    if (cursor == buf_end) {
         raiseErr("Unclosed quote.");
     }
     return cursor;
 }
 
-int parseBuffer(int len) {
-    int cursor_r = 0;
-    int len_w = 0;
+char * parseBuffer(char * rbuf_end) {
+    char * cursor_r = rbuf;
+    char * cursor_w = wbuf;
     int skip_attribute = 0;
-    int cursor_t;
-    int cursor_eoa;
-    while (cursor_r < len) {
-        if (rbuf[cursor_r] == '<') {
+    char * cursor_t;
+    char * cursor_eoa;
+    while (cursor_r < rbuf_end) {
+        if (*cursor_r == '<') {
             if (state == TAG) {
                 raiseErr("Nested tag is not allowed!");
             } else if (state == FREE) {
-                cursor_t = reachGreatThan(len, cursor_r);
-                if (cursor_t >= len) {
+                cursor_t = reachGreatThan(rbuf_end, cursor_r);
+                if (cursor_t >= rbuf_end) {
                     // not found
-                    fetchMore(&len, &len_w, &cursor_r);
+                    fetchMore(&rbuf_end, &cursor_w, &cursor_r);
                 } else {
                     // found
-                    if (rbuf[cursor_r + 1] == '/') {
-                        initiateEndTag(&cursor_r, &len_w, cursor_t, len);
-                    } else if (ISALPHANUM(rbuf[cursor_r + 1])) {
-                        initiateStartTag(&cursor_r, &len_w, cursor_t, len);
+                    if (*(cursor_r + 1) == '/') {
+                        initiateEndTag(&cursor_r, &cursor_w, cursor_t);
+                    } else if (ISALPHANUM(*(cursor_r + 1))) {
+                        initiateStartTag(&cursor_r, &cursor_w, cursor_t);
                     } else {
-                        memcpy(wbuf + len_w, rbuf + cursor_r, cursor_t - cursor_r + 1);
-                        len_w += cursor_t - cursor_r + 1;
+                        memcpy(cursor_w, cursor_r, cursor_t - cursor_r + 1);
+                        cursor_w += cursor_t - cursor_r + 1;
                         cursor_r = cursor_t + 1;
                     }
                 }
             } else if (state == DROP) {
-                cursor_t = reachGreatThan(len, cursor_r);
-                if (cursor_t >= len) {
+                cursor_t = reachGreatThan(rbuf_end, cursor_r);
+                if (cursor_t >= rbuf_end) {
                     // not found
-                    fetchMore(&len, &len_w, &cursor_r);
+                    fetchMore(&rbuf_end, &cursor_w, &cursor_r);
                 } else {
                     // found
-                    if (rbuf[cursor_r + 1] == '/') {
-                        initiateEndTag(&cursor_r, &len_w, cursor_t, len);
-                    } else if (ISALPHANUM(rbuf[cursor_r + 1])) {
-                        initiateStartTag(&cursor_r, &len_w, cursor_t, len);
+                    if (*(cursor_r + 1) == '/') {
+                        initiateEndTag(&cursor_r, &cursor_w, cursor_t);
+                    } else if (ISALPHANUM(*(cursor_r + 1))) {
+                        initiateStartTag(&cursor_r, &cursor_w, cursor_t);
                     } else {
-                        memcpy(wbuf + len_w, rbuf + cursor_r, cursor_t - cursor_r + 1);
-                        len_w += cursor_t - cursor_r + 1;
+                        memcpy(cursor_w, cursor_r, cursor_t - cursor_r + 1);
+                        cursor_w += cursor_t - cursor_r + 1;
                         cursor_r = cursor_t + 1;
                     }
                 }
             }
         } else {
             if (state == FREE) {
-                wbuf[len_w++] = rbuf[cursor_r++];
+                *(cursor_w++) = *(cursor_r++);
             } else if (state == TAG) {
                 // find '>'
-                if (rbuf[cursor_r] == '>') {
+                if (*(cursor_r) == '>') {
                     state = FREE;
-                    wbuf[len_w++] = rbuf[cursor_r++];
-                } else if (rbuf[cursor_r] == '/') {
-                    wbuf[len_w++] = rbuf[cursor_r++];
+                    *(cursor_w++) = *(cursor_r++);
+                } else if (*(cursor_r) == '/') {
+                    *(cursor_w++) = *(cursor_r++);
                 } else {
                     skip_attribute = 0;
                     cursor_eoa = reachEndOfAttr(cursor_t, cursor_r, &skip_attribute);
                     if (!skip_attribute) {
-                        memcpy(wbuf + len_w, rbuf + cursor_r, cursor_eoa - cursor_r + 1);
-                        len_w += cursor_eoa - cursor_r + 1;
+                        memcpy(cursor_w, cursor_r, cursor_eoa - cursor_r + 1);
+                        cursor_w += cursor_eoa - cursor_r + 1;
                     }
                     cursor_r = cursor_eoa + 1;
                 }
@@ -366,19 +377,19 @@ int parseBuffer(int len) {
             }
         }
     }
-    wbuf[len_w] = 0;
-    fprintf(stderr, "Written: %d, %s\n", len_w, wbuf);
-    return len_w;
+    fprintf(stderr, "Written: %ld, %s\n", cursor_w - wbuf, wbuf);
+    return cursor_w;
 }
 
 int main(int argc, char* argv[]) {
     int rv;
+    char * wbuf_end;
 
     // Initialize the state to FREE
     state = FREE;
 
     // Initialize the buffer
-    len_buf = 1 + BUFFER_INCREMENT;
+    len_buf = BUFFER_INCREMENT;
     rbuf = Malloc(len_buf);
     wbuf = Malloc(len_buf);
 
@@ -386,12 +397,11 @@ int main(int argc, char* argv[]) {
     parseArgs(argc, argv);
 
     // Read a block from input, process and write to output
-    while ((rv = read(0, rbuf, len_buf - 1)) > 0) {
-        rbuf[rv] = 0;
+    while ((rv = read(0, rbuf, len_buf)) > 0) {
         fprintf(stderr, "%d byte read\n-------\n[%s]\n", rv, rbuf);
         // wbuf may change in parseBuffer
-        rv = parseBuffer(rv);
-        Write(wbuf, rv);
+        wbuf_end = parseBuffer(rbuf + rv);
+        Write(wbuf, wbuf_end - wbuf);
     }
     return 0;
 
