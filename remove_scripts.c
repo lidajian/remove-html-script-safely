@@ -256,9 +256,11 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
 void initiateEndTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
     char * cursor_n = reachEndOfName(cursor_t, *cursor_r + 2);
     int temp_len;
-    if ((cursor_n - *cursor_r - 2 == 6) && strncmp_lower(*cursor_r + 2, "script", 6) == 0) {
+    if (strncmp_lower(*cursor_r + 2, "script", 6) == 0) {
         // </script...>: set state ACCEPT and step through it
         state = ACCEPT;
+        *cursor_r = cursor_t + 1;
+    } else if (state == DROP) {
         *cursor_r = cursor_t + 1;
     } else {
         // set state as INTAG, copy to write buffer and step pass the name
@@ -284,11 +286,13 @@ void initiateStartTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
         memcpy(*cursor_w, *cursor_r, temp_len);
         *cursor_w += temp_len;
         *cursor_r = cursor_t + 1;
-    } else if ((cursor_n - *cursor_r - 1 == 6) && strncmp_lower(*cursor_r + 1, "script", 6) == 0) {
+    } else if (strncmp_lower(*cursor_r + 1, "script", 6) == 0) {
         // <script...>: set state as DROP, step pass it
         if (*(cursor_t - 1) != '/') {
             state = DROP;
         }
+        *cursor_r = cursor_t + 1;
+    } else if (state == DROP) {
         *cursor_r = cursor_t + 1;
     } else {
         // set state as INTAG, copy to write buffer and step pass the name
@@ -368,24 +372,7 @@ char * parseBuffer(char * rbuf_end) {
         if (*cursor_r == '<') {
             if (state == INTAG) {
                 raiseErr("Nested tag is not allowed!");
-            } else if (state == ACCEPT) {
-                cursor_t = reachGreatThan(rbuf_end, cursor_r);
-                if (cursor_t >= rbuf_end) {
-                    // not found
-                    fetchMore(&rbuf_end, &cursor_w, &cursor_r);
-                } else {
-                    // found
-                    if (*(cursor_r + 1) == '/') {
-                        initiateEndTag(&cursor_r, &cursor_w, cursor_t);
-                    } else if (ISALPHANUM(*(cursor_r + 1))) {
-                        initiateStartTag(&cursor_r, &cursor_w, cursor_t);
-                    } else {
-                        memcpy(cursor_w, cursor_r, cursor_t - cursor_r + 1);
-                        cursor_w += cursor_t - cursor_r + 1;
-                        cursor_r = cursor_t + 1;
-                    }
-                }
-            } else if (state == DROP) {
+            } else {
                 cursor_t = reachGreatThan(rbuf_end, cursor_r);
                 if (cursor_t >= rbuf_end) {
                     // not found
