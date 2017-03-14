@@ -11,7 +11,7 @@
 #define ISALPHANUM(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ? 1 : 0)
 
 // 1 if is space, 0 otherwise
-#define ISSPACE(c) ((c == ' ' || c == '\n' || c == '\t') ? 1 : 0)
+#define ISSPACE(c) ((c == ' ' || c == '\n' || c == '\t' || c == '\r') ? 1 : 0)
 
 // 1 if is quote, 0 otherwise
 #define ISQUOTE(c) ((c == '\'' || c == '\"') ? 1 : 0)
@@ -147,6 +147,13 @@ int strncmp_lower(const char * str1, const char * str2, size_t num) {
     char c;
     while (num != 0) {
         c = *str1;
+
+        // jump pass spaces between characters
+        if (ISSPACE(c)) {
+            ++str1;
+            continue;
+        }
+
         if (TOLOWER(c) != *str2) {
             return -1;
         }
@@ -318,7 +325,11 @@ char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
         *skip_attribute = 1;
     } else if (strncmp_lower(cursor, "href", 4) == 0 ||
             strncmp_lower(cursor, "action", 6) == 0 ||
-            strncmp_lower(cursor, "formaction", 10) == 0) {
+            strncmp_lower(cursor, "formaction", 10) == 0 ||
+            strncmp_lower(cursor, "src", 3) == 0 ||
+            strncmp_lower(cursor, "lowsrc", 6) == 0 ||
+            strncmp_lower(cursor, "dynsrc", 6) == 0 ||
+            strncmp_lower(cursor, "background", 10) == 0) {
         is_sensitive_tag = 1;
     }
 
@@ -442,6 +453,7 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "%d byte read\n-------\n[%s]\n", rv, rbuf);
         // wbuf may change in parseBuffer
         wbuf_end = parseBuffer(rbuf + rv);
+        fprintf(stderr, "write length: %ld\n", wbuf_end - wbuf);
         Write(wbuf, wbuf_end - wbuf);
     }
     return 0;
