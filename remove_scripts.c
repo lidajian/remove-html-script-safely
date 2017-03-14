@@ -10,6 +10,9 @@
 // 1 if is alphanumeric, 0 otherwise
 #define ISALPHANUM(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ? 1 : 0)
 
+// 1 if is alphanumeric and '-', 0 otherwise
+#define ISALPHANUM_AND_SPECIAL(c) (((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') ? 1 : 0)
+
 // 1 if is space, 0 otherwise
 #define ISSPACE(c) ((c == ' ' || c == '\n' || c == '\t' || c == '\r') ? 1 : 0)
 
@@ -17,6 +20,8 @@
 #define ISQUOTE(c) ((c == '\'' || c == '\"') ? 1 : 0)
 
 #define BUFFER_INCREMENT 5
+
+//#define DEBUG
 
 /*
  * Global variables
@@ -68,7 +73,9 @@ int Open(const char * path, int oflag) {
         rv = open(path, oflag);
     }
     if (rv < 0) {
+#ifdef DEBUG
         fprintf(stderr, "Cannot open file %s\n", path);
+#endif
         exit(EXIT_FAILURE);
     }
     return rv;
@@ -178,7 +185,7 @@ char * reachGreatThan(char * buf_end, char * cursor) {
  * reachEndOfName: Advance the cursor to the first non-alphanumeric character
  */
 char * reachEndOfName(char * buf_end, char * cursor) {
-    while (cursor < buf_end && ISALPHANUM(*cursor)) {
+    while (cursor < buf_end && ISALPHANUM_AND_SPECIAL(*cursor)) {
         cursor++;
     }
     return cursor;
@@ -226,15 +233,19 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         }
         *rbuf_end += rv;
 
+#ifdef DEBUG
         fprintf(stderr, "Realloc: %d byte read, length is %ld\n", rv, *rbuf_end - rbuf);
         fprintf(stderr, "-------\n[%s]\n", rbuf);
+#endif
 
     } else {
         // if '<' not at the beginning of buffer, try to move '<' to beginning
         // and read cursor_r byte
         if (*cursor_w > wbuf) {
             Write(wbuf, *cursor_w - wbuf);
+#ifdef DEBUG
             fprintf(stderr, "Written: %ld\n", *cursor_w - wbuf);
+#endif
             *cursor_w = wbuf;
         }
 
@@ -248,8 +259,10 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         }
         *rbuf_end += rv - (*cursor_r - rbuf);
 
+#ifdef DEBUG
         fprintf(stderr, "%d byte read, length is %ld\n", rv, *rbuf_end - rbuf);
         fprintf(stderr, "-------\n[%s]\n", rbuf);
+#endif
 
         // reset cursor of read buffer
         *cursor_r = rbuf;
@@ -263,7 +276,7 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
 void initiateEndTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
     char * cursor_n = reachEndOfName(cursor_t, *cursor_r + 2);
     int temp_len;
-    if (strncmp_lower(*cursor_r + 2, "script", 6) == 0) {
+    if (strncmp_lower(*cursor_r + 2, "script", strlen("script")) == 0) {
         // </script...>: set state ACCEPT and step through it
         state = ACCEPT;
         *cursor_r = cursor_t + 1;
@@ -293,7 +306,7 @@ void initiateStartTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
         memcpy(*cursor_w, *cursor_r, temp_len);
         *cursor_w += temp_len;
         *cursor_r = cursor_t + 1;
-    } else if (strncmp_lower(*cursor_r + 1, "script", 6) == 0) {
+    } else if (strncmp_lower(*cursor_r + 1, "script", strlen("script")) == 0) {
         // <script...>: set state as DROP, step pass it
         if (*(cursor_t - 1) != '/') {
             state = DROP;
@@ -317,19 +330,20 @@ void initiateStartTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
 char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
     char c;
     int is_sensitive_tag = 0;
+    int is_quote_existed = 1;
 
     // skip space
     cursor = skipSpace(rbuf_end, cursor);
 
-    if (strncmp_lower(cursor, "on", 2) == 0) {
+    if (strncmp_lower(cursor, "on", strlen("on")) == 0) {
         *skip_attribute = 1;
-    } else if (strncmp_lower(cursor, "href", 4) == 0 ||
-            strncmp_lower(cursor, "action", 6) == 0 ||
-            strncmp_lower(cursor, "formaction", 10) == 0 ||
-            strncmp_lower(cursor, "src", 3) == 0 ||
-            strncmp_lower(cursor, "lowsrc", 6) == 0 ||
-            strncmp_lower(cursor, "dynsrc", 6) == 0 ||
-            strncmp_lower(cursor, "background", 10) == 0) {
+    } else if (strncmp_lower(cursor, "href", strlen("href")) == 0 ||
+            strncmp_lower(cursor, "action", strlen("action")) == 0 ||
+            strncmp_lower(cursor, "formaction", strlen("formaction")) == 0 ||
+            strncmp_lower(cursor, "src", strlen("src")) == 0 ||
+            strncmp_lower(cursor, "lowsrc", strlen("lowsrc")) == 0 ||
+            strncmp_lower(cursor, "dynsrc", strlen("dynsrc")) == 0 ||
+            strncmp_lower(cursor, "background", strlen("background")) == 0) {
         is_sensitive_tag = 1;
     }
 
@@ -349,23 +363,34 @@ char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
 
     // match quote sign
     if (!ISQUOTE(*cursor)) {
-        raiseErr("Attribute error!");
+        is_quote_existed = 0;
+    } else {
+        c = *(cursor++);
     }
-    c = *(cursor++);
 
     // skip space
     cursor = skipSpace(rbuf_end, cursor);
 
-    if (is_sensitive_tag && (strncmp_lower(cursor, "javascript:", 11) == 0)) {
+    if (is_sensitive_tag && (strncmp_lower(cursor, "javascript:", strlen("javascript:")) == 0)) {
         *skip_attribute = 1;
     }
 
-    // match another quote sign
-    while (cursor < rbuf_end && *cursor != c) {
-        ++cursor;
-    }
-    if (cursor == rbuf_end) {
-        raiseErr("Unclosed quote.");
+    if (is_quote_existed) {
+        // match another quote sign
+        while (cursor < rbuf_end && *cursor != c) {
+            ++cursor;
+        }
+        if (cursor == rbuf_end) {
+            raiseErr("Unclosed quote.");
+        }
+    } else {
+        while (cursor < rbuf_end &&
+                !ISSPACE(*cursor) &&
+                !(*cursor == '/' && *(cursor + 1) == '>') && // "/>"
+                !(*cursor == '>')) { // ">"
+            ++cursor;
+        }
+        --cursor;
     }
     return cursor;
 }
@@ -425,7 +450,9 @@ char * parseBuffer(char * rbuf_end) {
             }
         }
     }
+#ifdef DEBUG
     fprintf(stderr, "Written: %ld, %s\n", cursor_w - wbuf, wbuf);
+#endif
     return cursor_w;
 }
 
@@ -450,10 +477,14 @@ int main(int argc, char* argv[]) {
 
     // Read a block from input, process and write to output
     while ((rv = read(0, rbuf, len_buf)) > 0) {
+#ifdef DEBUG
         fprintf(stderr, "%d byte read\n-------\n[%s]\n", rv, rbuf);
+#endif
         // wbuf may change in parseBuffer
         wbuf_end = parseBuffer(rbuf + rv);
+#ifdef DEBUG
         fprintf(stderr, "write length: %ld\n", wbuf_end - wbuf);
+#endif
         Write(wbuf, wbuf_end - wbuf);
     }
     return 0;
