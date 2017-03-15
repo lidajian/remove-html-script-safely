@@ -420,9 +420,11 @@ char * parseBuffer(char * rbuf_end) {
                     } else if (ISALPHANUM(*(cursor_r + 1))) {
                         initiateStartTag(&cursor_r, &cursor_w, cursor_t);
                     } else {
-                        memcpy(cursor_w, cursor_r, cursor_t - cursor_r + 1);
-                        cursor_w += cursor_t - cursor_r + 1;
-                        cursor_r = cursor_t + 1;
+                        if (state == ACCEPT) {
+                            *(cursor_w++) = *(cursor_r++);
+                        } else {
+                            ++cursor_r;
+                        }
                     }
                 }
             }
