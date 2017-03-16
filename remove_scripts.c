@@ -21,7 +21,7 @@
 
 #define BUFFER_INCREMENT 5
 
-#define DEBUG
+//#define DEBUG
 
 /*
  * Global variables
@@ -250,8 +250,7 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         }
 
         // move incomplete data to the beginning of buffer
-        memcpy(rbuf, *cursor_r, *rbuf_end - *cursor_r);
-
+        memmove(rbuf, *cursor_r, *rbuf_end - *cursor_r);
         // read data
         rv = Read(rbuf + (*rbuf_end - *cursor_r), *cursor_r - rbuf);
         if (rv == 0) {
