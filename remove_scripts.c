@@ -11,7 +11,7 @@
 #define ISALPHANUM(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ? 1 : 0)
 
 // 1 if is alphanumeric and '-', 0 otherwise
-#define ISALPHANUM_AND_SPECIAL(c) (((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') ? 1 : 0)
+#define ISALPHANUM_AND_SPECIAL(c) (((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') ? 1 : 0)
 
 // 1 if is space, 0 otherwise
 #define ISSPACE(c) ((c == ' ' || c == '\n' || c == '\t' || c == '\r') ? 1 : 0)
@@ -21,7 +21,7 @@
 
 #define BUFFER_INCREMENT 5
 
-//#define DEBUG
+#define DEBUG
 
 /*
  * Global variables
@@ -354,12 +354,17 @@ char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
     cursor = skipSpace(rbuf_end, cursor);
 
     // match an '='
-    if (*(cursor++) != '=') {
-        raiseErr("Attribute error!");
+    if (*(cursor) != '=') {
+        return cursor - 1;
+/*
+#ifdef DEBUG
+        fprintf(stderr, "rbuf: %s\n", cursor-1);
+#endif
+        raiseErr("Attribute error!");*/
     }
 
     // skip space
-    cursor = skipSpace(rbuf_end, cursor);
+    cursor = skipSpace(rbuf_end, cursor + 1);
 
     // match quote sign
     if (!ISQUOTE(*cursor)) {
@@ -402,7 +407,7 @@ char * parseBuffer(char * rbuf_end) {
     char * cursor_r = rbuf;
     char * cursor_w = wbuf;
     int skip_attribute = 0;
-    char * cursor_t;
+    char * cursor_t, *cursor_sp;
     char * cursor_eoa;
     while (cursor_r < rbuf_end) {
         if (*cursor_r == '<') {
@@ -433,10 +438,13 @@ char * parseBuffer(char * rbuf_end) {
                 *(cursor_w++) = *(cursor_r++);
             } else if (state == INTAG) {
                 // find '>'
-                if (*(cursor_r) == '>') {
+                cursor_sp = skipSpace(rbuf_end, cursor_r);
+                if (*(cursor_sp) == '>') {
                     state = ACCEPT;
+                    cursor_r = cursor_sp;
                     *(cursor_w++) = *(cursor_r++);
-                } else if (*(cursor_r) == '/') {
+                } else if (*(cursor_sp) == '/') {
+                    cursor_r = cursor_sp;
                     *(cursor_w++) = *(cursor_r++);
                 } else {
                     skip_attribute = 0;
