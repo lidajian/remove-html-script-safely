@@ -234,7 +234,7 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         *rbuf_end += rv;
 
 #ifdef DEBUG
-        fprintf(stderr, "Realloc: %d byte read, length is %ld\n", rv, *rbuf_end - rbuf);
+        fprintf(stderr, "Realloc: %d byte read, length is %d\n", rv, *rbuf_end - rbuf);
         fprintf(stderr, "-------\n[%s]\n", rbuf);
 #endif
 
@@ -244,7 +244,7 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         if (*cursor_w > wbuf) {
             Write(wbuf, *cursor_w - wbuf);
 #ifdef DEBUG
-            fprintf(stderr, "Written: %ld\n", *cursor_w - wbuf);
+            fprintf(stderr, "Written: %d\n", *cursor_w - wbuf);
 #endif
             *cursor_w = wbuf;
         }
@@ -260,7 +260,7 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         *rbuf_end += rv - (*cursor_r - rbuf);
 
 #ifdef DEBUG
-        fprintf(stderr, "%d byte read, length is %ld\n", rv, *rbuf_end - rbuf);
+        fprintf(stderr, "%d byte read, length is %d\n", rv, *rbuf_end - rbuf);
         fprintf(stderr, "-------\n[%s]\n", rbuf);
 #endif
 
@@ -461,7 +461,7 @@ char * parseBuffer(char * rbuf_end) {
         }
     }
 #ifdef DEBUG
-    fprintf(stderr, "Written: %ld, %s\n", cursor_w - wbuf, wbuf);
+    fprintf(stderr, "Written: %d, %s\n", cursor_w - wbuf, wbuf);
 #endif
     return cursor_w;
 }
@@ -493,7 +493,7 @@ int main(int argc, char* argv[]) {
         // wbuf may change in parseBuffer
         wbuf_end = parseBuffer(rbuf + rv);
 #ifdef DEBUG
-        fprintf(stderr, "write length: %ld\n", wbuf_end - wbuf);
+        fprintf(stderr, "write length: %d\n", wbuf_end - wbuf);
 #endif
         Write(wbuf, wbuf_end - wbuf);
     }
