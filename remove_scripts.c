@@ -21,7 +21,7 @@
 
 #define BUFFER_INCREMENT 5
 
-//#define DEBUG
+#define DEBUG
 
 /*
  * Global variables
@@ -446,8 +446,11 @@ char * parseBuffer(char * rbuf_end) {
                     cursor_r = cursor_sp;
                     *(cursor_w++) = *(cursor_r++);
                 } else {
-                    skip_attribute = 0;
+                    skip_attribute = 0; //hang 
                     cursor_eoa = reachEndOfAttr(cursor_t, cursor_r, &skip_attribute);
+                    if (cursor_r == cursor_eoa + 1) {
+                        cursor_eoa++;
+                    }
                     if (!skip_attribute) {
                         memcpy(cursor_w, cursor_r, cursor_eoa - cursor_r + 1);
                         cursor_w += cursor_eoa - cursor_r + 1;
