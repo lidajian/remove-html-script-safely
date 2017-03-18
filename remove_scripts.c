@@ -240,7 +240,7 @@ int matchJavascriptString(char * rbuf_end, char * cursor) {
     char c;
     while (match_cursor < match_cursor_end) {
         c = *cursor;
-        if (ISSPACE(c)) {
+        if (c == ' ' || c == '\t') {
             return 0;
         }
         c = nextChar(rbuf_end, &cursor);
