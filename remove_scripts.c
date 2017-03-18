@@ -7,6 +7,14 @@
 // if capital character, to lower case
 #define TOLOWER(c) ((c >= 'A' && c <= 'Z') ? (c + 32) : c)
 
+// 1 if is '0'-'9', 0 otherwise
+#define ISNUM(c) ((c >= '0' && c <= '9') ? 1 : 0)
+
+// 1 if is '0'-'9' or 'a'-'f', 0 otherwise
+#define ISHEX(c) (((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) ? 1 : 0)
+
+#define GETHEX(c) ((c > '9') ? (c - 'a') + 10 : c - '0')
+
 // 1 if is alphanumeric, 0 otherwise
 #define ISALPHANUM(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ? 1 : 0)
 
@@ -17,7 +25,7 @@
 #define ISSPACE(c) ((c == ' ' || c == '\n' || c == '\t' || c == '\r') ? 1 : 0)
 
 // 1 if is quote, 0 otherwise
-#define ISQUOTE(c) ((c == '\'' || c == '\"') ? 1 : 0)
+#define ISQUOTE(c) ((c == '\'' || c == '\"' || c == '`') ? 1 : 0)
 
 #define BUFFER_INCREMENT 5
 
@@ -155,12 +163,6 @@ int strncmp_lower(const char * str1, const char * str2, size_t num) {
     while (num != 0) {
         c = *str1;
 
-        // jump pass spaces between characters
-        if (ISSPACE(c)) {
-            ++str1;
-            continue;
-        }
-
         if (TOLOWER(c) != *str2) {
             return -1;
         }
@@ -169,6 +171,89 @@ int strncmp_lower(const char * str1, const char * str2, size_t num) {
         --num;
     }
     return 0;
+}
+
+/*
+ * nextChar: get next character at the cursor, unescape characters is neccessary
+ */
+char nextChar(char * buf_end, char ** cursor) {
+    char temp_c = *(*cursor);
+    char first_c = '\0';
+    int char_value = 0;
+    (*cursor)++;
+    if (temp_c != '&') {
+        return temp_c;
+    }
+    first_c = temp_c;
+    temp_c = *(*cursor);
+    if (temp_c != '#') {
+        return first_c;
+    }
+    temp_c = *((*cursor) + 1);
+    temp_c = TOLOWER(temp_c);
+    if (temp_c == 'x') { // hex value
+        temp_c = *((*cursor) + 2);
+        temp_c = TOLOWER(temp_c);
+        if (ISHEX(temp_c)) {
+            char_value = GETHEX(temp_c);
+            (*cursor) += 3;
+            temp_c = *(*cursor);
+            temp_c = TOLOWER(temp_c);
+            while (ISHEX(temp_c)) {
+                char_value = char_value * 16 + GETHEX(temp_c);
+                (*cursor)++;
+                temp_c = *(*cursor);
+                temp_c = TOLOWER(temp_c);
+            }
+        }
+    } else if (ISNUM(temp_c)) { // decimal value
+        char_value = temp_c - '0';
+        (*cursor) += 2;
+        temp_c = *(*cursor);
+        temp_c = TOLOWER(temp_c);
+        while (ISNUM(temp_c)) {
+            char_value = char_value * 10 + (temp_c - '0');
+            (*cursor)++;
+            temp_c = *(*cursor);
+            temp_c = TOLOWER(temp_c);
+        }
+    } else {
+        return first_c;
+    }
+    if (temp_c == ';') {
+        (*cursor)++;
+    }
+    if (char_value > 255 || char_value < 0) {
+        return '\0';
+    } else {
+        return (char)char_value;
+    }
+}
+
+/*
+ * matchJavascriptString: Match "javascript:" regardless of escape characters
+ */
+int matchJavascriptString(char * rbuf_end, char * cursor) {
+    char javascript_str[] = "javascript:";
+    char * match_cursor = javascript_str;
+    char * match_cursor_end = javascript_str + strlen(javascript_str);
+    char c;
+    while (match_cursor < match_cursor_end) {
+        c = *cursor;
+        if (ISSPACE(c)) {
+            return 0;
+        }
+        c = nextChar(rbuf_end, &cursor);
+        c = TOLOWER(c);
+        if (ISSPACE(c)) {
+            continue;
+        } else if (c == *match_cursor) {
+            match_cursor++;
+        } else {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 /*
@@ -375,7 +460,7 @@ char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
     // skip space
     cursor = skipSpace(rbuf_end, cursor);
 
-    if (is_sensitive_tag && (strncmp_lower(cursor, "javascript:", strlen("javascript:")) == 0)) {
+    if (is_sensitive_tag && matchJavascriptString(rbuf_end, cursor)) {
         *skip_attribute = 1;
     }
 
@@ -446,10 +531,10 @@ char * parseBuffer(char * rbuf_end) {
                     cursor_r = cursor_sp;
                     *(cursor_w++) = *(cursor_r++);
                 } else {
-                    skip_attribute = 0; //hang 
+                    skip_attribute = 0;
                     cursor_eoa = reachEndOfAttr(cursor_t, cursor_r, &skip_attribute);
-                    if (cursor_r == cursor_eoa + 1) {
-                        cursor_eoa++;
+                    if (cursor_eoa < cursor_r) {
+                        cursor_eoa = cursor_r;
                     }
                     if (!skip_attribute) {
                         memcpy(cursor_w, cursor_r, cursor_eoa - cursor_r + 1);
