@@ -496,7 +496,7 @@ char * parseBuffer(char * rbuf_end) {
     while (cursor_r < rbuf_end) {
         if (*cursor_r == '<') {
             if (state == INTAG) {
-                raiseErr("Nested tag is not allowed!");
+                state = ACCEPT;
             } else {
                 cursor_t = reachGreatThan(rbuf_end, cursor_r);
                 if (cursor_t >= rbuf_end) {
