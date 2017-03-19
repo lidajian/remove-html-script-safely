@@ -15,6 +15,9 @@
 
 #define GETHEX(c) ((c > '9') ? (c - 'a') + 10 : c - '0')
 
+// 1 if is alpha, 0 otherwise
+#define ISALPHA(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ? 1 : 0)
+
 // 1 if is alphanumeric, 0 otherwise
 #define ISALPHANUM(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ? 1 : 0)
 
@@ -384,13 +387,7 @@ void initiateEndTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
 void initiateStartTag(char ** cursor_r, char ** cursor_w, char * cursor_t) {
     char * cursor_n = reachEndOfName(cursor_t, *cursor_r + 1);
     int temp_len;
-    if (*(*cursor_r + 1) == '!') {
-        // <!...> tag: simply step pass it
-        temp_len = cursor_t - *cursor_r + 1;
-        memcpy(*cursor_w, *cursor_r, temp_len);
-        *cursor_w += temp_len;
-        *cursor_r = cursor_t + 1;
-    } else if (strncmp_lower(*cursor_r + 1, "script", strlen("script")) == 0) {
+    if (strncmp_lower(*cursor_r + 1, "script", strlen("script")) == 0) {
         // <script...>: set state as DROP, step pass it
         if (*(cursor_t - 1) != '/') {
             state = DROP;
@@ -440,11 +437,6 @@ char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
     // match an '='
     if (*(cursor) != '=') {
         return cursor - 1;
-/*
-#ifdef DEBUG
-        fprintf(stderr, "rbuf: %s\n", cursor-1);
-#endif
-        raiseErr("Attribute error!");*/
     }
 
     // skip space
@@ -506,7 +498,7 @@ char * parseBuffer(char * rbuf_end) {
                     // found
                     if (*(cursor_r + 1) == '/') {
                         initiateEndTag(&cursor_r, &cursor_w, cursor_t);
-                    } else if (ISALPHANUM(*(cursor_r + 1))) {
+                    } else if (ISALPHA(*(cursor_r + 1))) {
                         initiateStartTag(&cursor_r, &cursor_w, cursor_t);
                     } else {
                         if (state == ACCEPT) {
