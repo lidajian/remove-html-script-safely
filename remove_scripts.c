@@ -32,7 +32,7 @@
 
 #define BUFFER_INCREMENT 5
 
-#define DEBUG
+//#define DEBUG
 
 /*
  * Global variables
@@ -317,7 +317,11 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         rv = Read(*rbuf_end, len_buf - (*rbuf_end - rbuf));
 
         if (rv == 0) {
-            raiseErr("Unclosed tag.");
+#ifdef DEBUG
+            fprintf(stderr, "1: %ld", *rbuf_end - rbuf);
+#endif
+            Write(rbuf, *rbuf_end - rbuf);
+            exit(0);
         }
         *rbuf_end += rv;
 
@@ -342,7 +346,11 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         // read data
         rv = Read(rbuf + (*rbuf_end - *cursor_r), *cursor_r - rbuf);
         if (rv == 0) {
-            raiseErr("Unclosed tag.");
+#ifdef DEBUG
+            fprintf(stderr, "2: %ld", *rbuf_end - *cursor_r);
+#endif
+            Write(rbuf, *rbuf_end - *cursor_r);
+            exit(0);
         }
         *rbuf_end += rv - (*cursor_r - rbuf);
 

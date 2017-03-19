@@ -11,3 +11,5 @@ remove_scripts: remove_scripts.c malloc-2.7.2.c
 
 clean:
 	rm -f remove_scripts malloc-2.7.2.o
+	# MacOS...
+	rm -rf remove_scripts.dSYM
