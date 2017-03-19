@@ -241,6 +241,19 @@ int matchJavascriptString(char * rbuf_end, char * cursor) {
     char * match_cursor = javascript_str;
     char * match_cursor_end = javascript_str + strlen(javascript_str);
     char c;
+    char * last_cursor = cursor;
+
+    // Skip protential space
+    while (cursor < rbuf_end) {
+        c = nextChar(rbuf_end, &cursor);
+        if (c > ' ' || c == '\0') { // ASCII 0x01 ~ 0x20
+            cursor = last_cursor;
+            break;
+        }
+        last_cursor = cursor;
+    }
+
+    // Match 'javascript:'
     while (match_cursor < match_cursor_end) {
         c = *cursor;
         if (c == ' ' || c == '\t') {
@@ -456,9 +469,6 @@ char * reachEndOfAttr(char * rbuf_end, char * cursor, int * skip_attribute) {
     } else {
         c = *(cursor++);
     }
-
-    // skip space
-    cursor = skipSpace(rbuf_end, cursor);
 
     if (is_sensitive_tag && matchJavascriptString(rbuf_end, cursor)) {
         *skip_attribute = 1;
