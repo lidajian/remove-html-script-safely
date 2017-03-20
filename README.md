@@ -50,6 +50,18 @@ Desired output (note that only the script is removed, and all other HTML element
 
 All teams must include a method called “win” with no parameters that prints the message “You have obtained code execution.”
 
+### What we did
+
+Our program remove JavaScript in two places:
+
+* \<script\>...\</script\>
+
+* Attributes whose value start with "javascript:"
+
+We also filtered most XSS scripts that still works on modern browsers ([XSS Filter Evasion Cheat Sheet](https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet#TD)). Some test can be found in input.html.
+
+We used [american fuzzy lop](http://lcamtuf.coredump.cx/afl/) to fuzz the program, afl reports no crash and a few 'false' hangs (cannot be manually replayed).
+
 ## BREAK-IT
 
 In the break-it phase, all teams will have access to the source code of all build-it turnins. Break-it submissions will consist of scripts that demonstrate a vulnerability or bug in one or more programs. Bugs should be labeled with a category (least to most severe by list below):
