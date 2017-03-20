@@ -32,8 +32,6 @@
 
 #define BUFFER_INCREMENT 5
 
-//#define DEBUG
-
 /*
  * Global variables
  */
@@ -84,9 +82,6 @@ int Open(const char * path, int oflag) {
         rv = open(path, oflag);
     }
     if (rv < 0) {
-#ifdef DEBUG
-        fprintf(stderr, "Cannot open file %s\n", path);
-#endif
         exit(EXIT_FAILURE);
     }
     return rv;
@@ -226,7 +221,7 @@ char nextChar(char * buf_end, char ** cursor) {
     if (temp_c == ';') {
         (*cursor)++;
     }
-    if (char_value > 255 || char_value < 0) {
+    if (char_value > 127 || char_value < 0) {
         return '\0';
     } else {
         return (char)char_value;
@@ -330,27 +325,15 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         rv = Read(*rbuf_end, len_buf - (*rbuf_end - rbuf));
 
         if (rv == 0) {
-#ifdef DEBUG
-            fprintf(stderr, "1: %ld", *rbuf_end - rbuf);
-#endif
             Write(rbuf, *rbuf_end - rbuf);
             exit(0);
         }
         *rbuf_end += rv;
-
-#ifdef DEBUG
-        fprintf(stderr, "Realloc: %d byte read, length is %d\n", rv, *rbuf_end - rbuf);
-        fprintf(stderr, "-------\n[%s]\n", rbuf);
-#endif
-
     } else {
         // if '<' not at the beginning of buffer, try to move '<' to beginning
         // and read cursor_r byte
         if (*cursor_w > wbuf) {
             Write(wbuf, *cursor_w - wbuf);
-#ifdef DEBUG
-            fprintf(stderr, "Written: %d\n", *cursor_w - wbuf);
-#endif
             *cursor_w = wbuf;
         }
 
@@ -359,18 +342,10 @@ void fetchMore(char ** rbuf_end, char ** cursor_w, char ** cursor_r) {
         // read data
         rv = Read(rbuf + (*rbuf_end - *cursor_r), *cursor_r - rbuf);
         if (rv == 0) {
-#ifdef DEBUG
-            fprintf(stderr, "2: %ld", *rbuf_end - *cursor_r);
-#endif
             Write(rbuf, *rbuf_end - *cursor_r);
             exit(0);
         }
         *rbuf_end += rv - (*cursor_r - rbuf);
-
-#ifdef DEBUG
-        fprintf(stderr, "%d byte read, length is %d\n", rv, *rbuf_end - rbuf);
-        fprintf(stderr, "-------\n[%s]\n", rbuf);
-#endif
 
         // reset cursor of read buffer
         *cursor_r = rbuf;
@@ -557,9 +532,7 @@ char * parseBuffer(char * rbuf_end) {
             }
         }
     }
-#ifdef DEBUG
-    fprintf(stderr, "Written: %d, %s\n", cursor_w - wbuf, wbuf);
-#endif
+
     return cursor_w;
 }
 
@@ -584,14 +557,8 @@ int main(int argc, char* argv[]) {
 
     // Read a block from input, process and write to output
     while ((rv = read(0, rbuf, len_buf)) > 0) {
-#ifdef DEBUG
-        fprintf(stderr, "%d byte read\n-------\n[%s]\n", rv, rbuf);
-#endif
         // wbuf may change in parseBuffer
         wbuf_end = parseBuffer(rbuf + rv);
-#ifdef DEBUG
-        fprintf(stderr, "write length: %d\n", wbuf_end - wbuf);
-#endif
         Write(wbuf, wbuf_end - wbuf);
     }
     return 0;
