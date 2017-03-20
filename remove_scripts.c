@@ -82,7 +82,7 @@ int Open(const char * path, int oflag) {
         rv = open(path, oflag);
     }
     if (rv < 0) {
-        exit(EXIT_FAILURE);
+        raiseErr("Open failed.");
     }
     return rv;
 }
