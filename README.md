@@ -58,7 +58,7 @@ Our program remove JavaScript in two places:
 
 * Attributes whose value start with "javascript:"
 
-We also filtered most XSS scripts that still works on modern browsers ([XSS Filter Evasion Cheat Sheet](https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet#TD)). Some test cases can be found in [input.html](input.html).
+We also filtered most XSS scripts that still works on modern browsers ([XSS Filter Evasion Cheat Sheet](https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet#TD)). Some test cases can be found in [input.html](test/input.html).
 
 We used [american fuzzy lop](http://lcamtuf.coredump.cx/afl/) to fuzz the program, afl reports no crash and a few 'false' hangs (cannot be manually replayed).
 
