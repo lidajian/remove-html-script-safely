@@ -60,6 +60,8 @@ Our program remove JavaScript in two places:
 
 We also filtered most XSS scripts that still works on modern browsers ([XSS Filter Evasion Cheat Sheet](https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet#TD)). Some test cases can be found in [input.html](test/input.html).
 
+We tested the functionality of our program on popular websites like [Google](https://www.google.com/) and [NetEase](http://www.163.com).
+
 We used [american fuzzy lop](http://lcamtuf.coredump.cx/afl/) to fuzz the program, afl reports no crash and a few 'false' hangs (cannot be manually replayed).
 
 ## BREAK-IT
